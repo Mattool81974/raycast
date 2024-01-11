@@ -19,11 +19,20 @@ class Raycast:
     """Classe contenant les résultats d'un raycast
     """
 
-    def __init__(self, objet_touche: ob.Objet, position_touche: tuple) -> None:
+    def __init__(self, distance: float, objet_touche: ob.Objet, position_touche: tuple) -> None:
         """Crée un résultat de raycast
         """
+        self.distance = distance
         self.objet_touche = objet_touche
         self.position_touche = position_touche
+
+    def get_distance(self) -> float:
+        """Retourne la distance de l'objet touché à l'objet qui envoie le raycast
+
+        Returns:
+            float: distance de l'objet touché à l'objet qui envoie le raycast
+        """
+        return self.distance
 
     def get_objet_touche(self) -> ob.Objet:
         """Retourne l'objet touché lors du raycast
@@ -225,7 +234,6 @@ class Scene_Graphique:
         Return:
             Raycast: résultat du raycast
         """
-        pg.draw.circle(self.get_rendu(), (255, 0, 255), (position_debut[0] * self.get_largeur_carre_2d(), position_debut[1] * self.get_largeur_carre_2d()), 5)
         ratio_h = -1
         if vecteur[0] != 0: ratio_h = abs(vecteur[1] / vecteur[0])
         ratio_v = -1
@@ -294,23 +302,30 @@ class Scene_Graphique:
                         objet_v = self.get_objet_sur_carte(x_v_i, int(y_v - arrondissement_v))
                         condition_v = objet_v == None
         
+        distance_finale = 0
+        distance_h = ob.distance(position_debut, (x_h, y_h))
+        distance_v = ob.distance(position_debut, (x_v, y_v))
         objet_final = None
         position_finale = ()
         if objet_h == None and objet_v == None:
             return None
         elif objet_h == None:
+            distance_finale = distance_v
             objet_final = objet_v
             position_finale = (x_v, y_v)
         elif objet_v == None:
+            distance_finale = distance_h
             objet_final = objet_h
             position_finale = (x_h, y_h)
-        elif ob.distance(position_debut, (x_h, y_h)) < ob.distance(position_debut, (x_v, y_v)):
+        elif distance_h < distance_v:
+            distance_finale = distance_h
             objet_final = objet_h
             position_finale = (x_h, y_h)
         else:
+            distance_finale = distance_v
             objet_final = objet_v
             position_finale = (x_v, y_v)
-        return Raycast(objet_final, position_finale)
+        return Raycast(distance_finale, objet_final, position_finale)
     
     def remplir_carte(self) -> None:
         """Rempli la carte avec du vide
@@ -322,7 +337,7 @@ class Scene_Graphique:
                 partie.append(0)
             self.get_carte().append(partie)
 
-    def rendu_2d(self):
+    def rendu_2d(self) -> None:
         """Met le rendu à jour avec la scène en 2D
         """
         retour = self.get_rendu() # Obtenir la scène où dessiner
@@ -336,6 +351,38 @@ class Scene_Graphique:
                 pg.draw.rect(retour, objet.get_couleur_2d(), (position[0] * self.get_largeur_carre_2d(), position[1] * self.get_hauteur_carre_2d(), self.get_largeur_carre_2d(), self.get_hauteur_carre_2d()))
             elif objet.get_forme_2d() == "cercle":
                 pg.draw.circle(retour, objet.get_couleur_2d(), (position[0] * self.get_largeur_carre_2d() + self.get_largeur_carre_2d() / 2, position[1] * self.get_hauteur_carre_2d() + self.get_largeur_carre_2d() / 2), self.get_largeur_carre_2d() / 2)
+
+    def rendu_3d(self, angle: float, position: tuple) -> None:
+        """Met le rendu à jour avec la scène en simili-3D
+
+        Args:
+            angle (float): angle du raycast
+            position (tuple): position de début du raycast
+        """
+        retour = self.get_rendu()
+        retour.fill((0, 0, 0))
+        pg.draw.rect(retour, (0, 128, 128), (0, 0, self.get_taille_fenetre()[0], self.get_taille_fenetre()[1] / 2))
+
+        fov = self.get_structure_de_base().get_fov()
+        nb_raycast = 275
+        ratio = fov / nb_raycast
+        ratio_fenetre_raycast = self.get_taille_fenetre()[0] / nb_raycast
+
+        distance_ecran = self.get_taille_fenetre()[1] / 2 * math.tan(math.radians(fov / 2))
+        hauteur_mur = 2
+        for i in range(nb_raycast):
+            angle_actuel = angle - fov / 2 + i * ratio
+            vecteur_avant = ob.calculer_vecteur(angle_actuel)
+            raycast = self.ray_cast(position, vecteur_avant)
+            if raycast != None:
+                distance = (raycast.get_distance() + 0.0001) * math.cos(math.radians(angle - angle_actuel))
+
+                hauteur = (hauteur_mur / distance) * distance_ecran
+                largeur = ratio_fenetre_raycast
+                x = i * ratio_fenetre_raycast
+                y = self.get_taille_fenetre()[1] / 2 - hauteur / 2
+                
+                pg.draw.rect(retour, (255, 255, 255), (x, y, largeur, hauteur))
 
 class Scene:
     """Classe représentant une scène normal
@@ -372,7 +419,7 @@ class Scene:
         self.remplir_carte() # Préparer la carte
         self.charger_carte(contenu[1:])
 
-        self.joueur = self.nouvel_objet("joueur", 1, 1, couleur_2d = (0, 255, 0), graphique = False, physique = False, type = "joueur")
+        self.joueur = self.nouvel_objet("joueur", 1.5, 1.5, couleur_2d = (0, 255, 0), graphique = False, physique = False, type = "joueur")
 
     def ajouter_objet(self, nom: str, objet: ob.Objet) -> None:
         """Rajoute un objet déjà crée dans le jeu
@@ -429,7 +476,7 @@ class Scene:
 
         if self.is_graphique(): # Réalise une frame de la scène graphique si il y en a une
             self.get_scene_graphique().frame()
-            self.get_scene_graphique().rendu_2d()
+            self.get_scene_graphique().rendu_3d(self.get_joueur().get_angle(), self.get_joueur().get_position())
 
         self.simuler_joueur() # S'occuper du joueur
 
@@ -574,19 +621,3 @@ class Scene:
 
         rotation = (vitesse_rotation * touches_h[1] - vitesse_rotation * touches_h[0])
         joueur.rotate(rotation)
-
-        if self.is_graphique(): # Dessiner l'avant du joueur
-            position = (joueur.get_position()[0], joueur.get_position()[1])
-            position_raycast = (joueur.get_position()[0] + 1 - 0.5, joueur.get_position()[1] + 1 - 0.5)
-
-            angle = joueur.get_angle()
-            fov = self.get_structure_de_base().get_fov()
-            nb_raycast = 225
-            position = (position[0] * self.get_scene_graphique().get_largeur_carre_2d() + self.get_scene_graphique().get_largeur_carre_2d() / 2, position[1] * self.get_scene_graphique().get_hauteur_carre_2d() + self.get_scene_graphique().get_largeur_carre_2d() / 2)
-            ratio = fov / nb_raycast
-            for i in range(nb_raycast):
-                vecteur_avant = ob.calculer_vecteur(angle - fov / 2 + i * ratio)
-                raycast = self.get_scene_graphique().ray_cast(position_raycast, vecteur_avant)
-                if raycast != None:
-                    position_finale = (raycast.get_position_touche()[0] * self.get_scene_graphique().get_largeur_carre_2d(), raycast.get_position_touche()[1] * self.get_scene_graphique().get_largeur_carre_2d())
-                    pg.draw.line(self.get_scene_graphique().get_rendu(), (0, 0, 255), position, position_finale, 1)

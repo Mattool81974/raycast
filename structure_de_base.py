@@ -14,7 +14,7 @@ class Structure_De_Base:
         """Créer une structure de base
         """
         self.delta_time = 0
-        self.fov = 45
+        self.fov = 60
         self.taille_fenetre = taille_fenetre
         self.touches_pressees = []
 
