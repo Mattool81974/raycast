@@ -3,6 +3,10 @@
 #-------------------------------------
 
 # Importer les librairies
-import scene as sc
+import jeu
 
-scene = sc.Scene("test", "cartes/niveau0.wad")
+moteur_de_jeu = jeu.Moteur_De_Jeu((550, 550))
+scene = moteur_de_jeu.nouvelle_scene("test", "cartes/niveau0.wad")
+moteur_de_jeu.set_scene_actuelle("test")
+
+moteur_de_jeu.lancer()
