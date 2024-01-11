@@ -9,13 +9,40 @@
 #     -Scene_Physique permet de donner une physique au jeu.
 
 # Importer les librairies
+import math
 import objet as ob
 import os
 import pygame as pg
 import structure_de_base as sb
 
+class Raycast:
+    """Classe contenant les résultats d'un raycast
+    """
+
+    def __init__(self, objet_touche: ob.Objet, position_touche: tuple) -> None:
+        """Crée un résultat de raycast
+        """
+        self.objet_touche = objet_touche
+        self.position_touche = position_touche
+
+    def get_objet_touche(self) -> ob.Objet:
+        """Retourne l'objet touché lors du raycast
+
+        Returns:
+            ob.Objet: objet touché lors du raycast
+        """
+        return self.objet_touche
+    
+    def get_position_touche(self) -> tuple:
+        """Retourne la position touchée par le raycast
+
+        Returns:
+            tuple: position touchée par le raycast
+        """
+        return self.position_touche
+
 class Scene_Physique:
-    """Class représentant une scène physique
+    """Classe représentant une scène physique
     """
 
     def __init__(self, structure_de_base: sb.Structure_De_Base) -> None:
@@ -56,6 +83,10 @@ class Scene_Graphique:
 
         self.remplir_carte()
 
+        self.hauteur_carre_2d = self.get_taille_fenetre()[1] / len(self.get_carte()[0]) # Créer les tailles d'un carré pour un rendu 2D
+        self.largeur_carre_2d = self.get_taille_fenetre()[0] / len(self.get_carte())
+        self.rendu = pg.Surface(self.get_taille_fenetre()).convert_alpha() # Créer le rendu de la scène
+
     def ajouter_objet(self, nom: str, objet: ob.Objet_Graphique) -> None:
         """Ajoute un objet dans la scène
 
@@ -79,6 +110,22 @@ class Scene_Graphique:
             list: carte de la scène
         """
         return self.carte
+    
+    def get_hauteur_carre_2d(self) -> float:
+        """Retourne la hauteur d'un carré pour un rendu 2D
+
+        Returns:
+            float: hauteur d'un carré pour un rendu 2D
+        """
+        return self.hauteur_carre_2d
+    
+    def get_largeur_carre_2d(self) -> float:
+        """Retourne la largeur d'un carré pour un rendu 2D
+
+        Returns:
+            float: largeur d'un carré pour un rendu 2D
+        """
+        return self.largeur_carre_2d
 
     def get_nom(self) -> str:
         """Retourne le nom de la scène graphique
@@ -118,6 +165,14 @@ class Scene_Graphique:
             dict: objets dans la scène
         """
         return self.objets
+    
+    def get_rendu(self) -> pg.Surface:
+        """Retourne le rendu de la scène
+
+        Returns:
+            pg.Surface: rendu de la scène
+        """
+        return self.rendu
     
     def get_structure_de_base(self) -> sb.Structure_De_Base:
         """Retourne la structure de base du jeu
@@ -160,6 +215,103 @@ class Scene_Graphique:
         self.ajouter_objet(nom, objet_graphique)
         return objet_graphique
     
+    def ray_cast(self, position_debut: tuple, vecteur: tuple) -> Raycast:
+        """Effectue un raycast
+
+        Args:
+            position_debut (tuple): position du début du ray-cast
+            vecteur (tuple): vecteur pour le raycast
+
+        Return:
+            Raycast: résultat du raycast
+        """
+        pg.draw.circle(self.get_rendu(), (255, 0, 255), (position_debut[0] * self.get_largeur_carre_2d(), position_debut[1] * self.get_largeur_carre_2d()), 5)
+        ratio_h = -1
+        if vecteur[0] != 0: ratio_h = abs(vecteur[1] / vecteur[0])
+        ratio_v = -1
+        if vecteur[1] != 0: ratio_v = abs(vecteur[0] / vecteur[1])
+
+        arrondissement_h = 0
+        if vecteur[0] < 0: arrondissement_h = 1
+        multiplier_h = 1
+        if vecteur[0] < 0: multiplier_h = -1
+        objet_h = None
+        x_h = math.ceil(position_debut[0])
+        difference_h = position_debut[0] - x_h
+        if vecteur[0] < 0:
+            x_h = math.floor(position_debut[0])
+            difference_h = x_h - position_debut[0]
+        y_h = position_debut[1] - ratio_h * difference_h
+        if vecteur[1] < 0: y_h = position_debut[1] - ratio_h * -difference_h
+        if (vecteur[0] < 0) != (vecteur[1] <= 0) : ratio_h = -ratio_h
+
+        arrondissement_v = 0
+        if vecteur[1] < 0: arrondissement_v = 1
+        difference_v = 0
+        multiplier_v = 1
+        if vecteur[1] < 0: multiplier_v = -1
+        objet_v = None
+        y_v = math.floor(position_debut[1])
+        difference_v = position_debut[1] - y_v
+        if vecteur[1] > 0:
+            y_v = math.ceil(position_debut[1])
+            difference_v = y_v - position_debut[1]
+        x_v = position_debut[0] + ratio_v * difference_v
+        if vecteur[0] < 0: x_v = position_debut[0] + ratio_v * -difference_v
+        if (vecteur[0] < 0) != (vecteur[1] <= 0) : ratio_v = -ratio_v
+
+        condition_h = (objet_h == None and x_h - arrondissement_h >= 0 and x_h < self.get_taille()[0] and y_h >= 0 and y_h < self.get_taille()[1] and vecteur[0] != 0)
+        condition_v = (objet_v == None and x_v >= 0 and x_v < self.get_taille()[0] and y_v - arrondissement_v >= 0 and y_v < self.get_taille()[1] and vecteur[1] != 0)
+
+        y_h_i = math.floor(y_h)
+        if condition_h and self.get_objet_sur_carte(int(x_h - arrondissement_h), y_h_i) != 0:
+            objet_h = self.get_objet_sur_carte(int(x_h - arrondissement_h), y_h_i)
+            condition_h = (objet_h == None)
+
+        x_v_i = math.floor(x_v)
+        if condition_v and self.get_objet_sur_carte(x_v_i, int(y_v - arrondissement_v)) != 0:
+            objet_v = self.get_objet_sur_carte(x_v_i, int(y_v - arrondissement_v))
+            condition_v = objet_v == None
+
+        while (condition_h or condition_v):
+            if condition_h: # Réaliser le raycast horizontal
+                x_h += multiplier_h
+                y_h += ratio_h * multiplier_h
+
+                condition_h = (x_h - arrondissement_h >= 0 and x_h < self.get_taille()[0] and y_h >= 0 and y_h < self.get_taille()[1])
+                y_h_i = math.floor(y_h)
+                if condition_h and self.get_objet_sur_carte(int(x_h - arrondissement_h), y_h_i) != 0:
+                        objet_h = self.get_objet_sur_carte(int(x_h - arrondissement_h), y_h_i)
+                        condition_h = (objet_h == None)
+
+            if condition_v: # Réaliser le raycast vertical
+                x_v += ratio_v * multiplier_v
+                y_v += multiplier_v
+
+                condition_v = (x_v >= 0 and x_v < self.get_taille()[0] and y_v - arrondissement_v >= 0 and y_v < self.get_taille()[1])
+                x_v_i = math.floor(x_v)
+                if condition_v and self.get_objet_sur_carte(x_v_i, int(y_v - arrondissement_v)) != 0:
+                        objet_v = self.get_objet_sur_carte(x_v_i, int(y_v - arrondissement_v))
+                        condition_v = objet_v == None
+        
+        objet_final = None
+        position_finale = ()
+        if objet_h == None and objet_v == None:
+            return None
+        elif objet_h == None:
+            objet_final = objet_v
+            position_finale = (x_v, y_v)
+        elif objet_v == None:
+            objet_final = objet_h
+            position_finale = (x_h, y_h)
+        elif ob.distance(position_debut, (x_h, y_h)) < ob.distance(position_debut, (x_v, y_v)):
+            objet_final = objet_h
+            position_finale = (x_h, y_h)
+        else:
+            objet_final = objet_v
+            position_finale = (x_v, y_v)
+        return Raycast(objet_final, position_finale)
+    
     def remplir_carte(self) -> None:
         """Rempli la carte avec du vide
         """
@@ -170,24 +322,20 @@ class Scene_Graphique:
                 partie.append(0)
             self.get_carte().append(partie)
 
-    def rendu_2d(self) -> pg.Surface:
-        """Retourne le rendu 2D de la scène
-
-        Returns:
-            pg.Surface: rendu 2D de la scène
+    def rendu_2d(self):
+        """Met le rendu à jour avec la scène en 2D
         """
-        retour = pg.Surface(self.get_taille_fenetre()).convert_alpha() # Créer la surface d'affichage
+        retour = self.get_rendu() # Obtenir la scène où dessiner
         retour.fill((0, 0, 0))
-        hauteur_carre = self.get_taille_fenetre()[1] / len(self.get_carte()[0])
-        largeur_carre = self.get_taille_fenetre()[0] / len(self.get_carte())
-        for objet in self.get_objets().keys():
+        self.hauteur_carre = self.get_taille_fenetre()[1] / len(self.get_carte()[0])
+        self.largeur_carre = self.get_taille_fenetre()[0] / len(self.get_carte())
+        for objet in self.get_objets().keys(): # Dessinr objets par objets
             objet = self.get_objet_de_nom(objet)
             position = objet.get_objet().get_position()
             if objet.get_forme_2d() == "rectangle":
-                pg.draw.rect(retour, objet.get_couleur_2d(), (position[0] * largeur_carre, position[1] * hauteur_carre, largeur_carre, hauteur_carre))
+                pg.draw.rect(retour, objet.get_couleur_2d(), (position[0] * self.get_largeur_carre_2d(), position[1] * self.get_hauteur_carre_2d(), self.get_largeur_carre_2d(), self.get_hauteur_carre_2d()))
             elif objet.get_forme_2d() == "cercle":
-                pg.draw.circle(retour, objet.get_couleur_2d(), (position[0] * largeur_carre + largeur_carre / 2, position[1] * hauteur_carre + largeur_carre / 2), largeur_carre / 2)
-        return retour
+                pg.draw.circle(retour, objet.get_couleur_2d(), (position[0] * self.get_largeur_carre_2d() + self.get_largeur_carre_2d() / 2, position[1] * self.get_hauteur_carre_2d() + self.get_largeur_carre_2d() / 2), self.get_largeur_carre_2d() / 2)
 
 class Scene:
     """Classe représentant une scène normal
@@ -224,7 +372,7 @@ class Scene:
         self.remplir_carte() # Préparer la carte
         self.charger_carte(contenu[1:])
 
-        self.joueur = self.nouvel_objet("joueur", 1, 1, couleur_2d = (0, 255, 0), graphique = True, physique = False, type = "joueur")
+        self.joueur = self.nouvel_objet("joueur", 1, 1, couleur_2d = (0, 255, 0), graphique = False, physique = False, type = "joueur")
 
     def ajouter_objet(self, nom: str, objet: ob.Objet) -> None:
         """Rajoute un objet déjà crée dans le jeu
@@ -281,6 +429,7 @@ class Scene:
 
         if self.is_graphique(): # Réalise une frame de la scène graphique si il y en a une
             self.get_scene_graphique().frame()
+            self.get_scene_graphique().rendu_2d()
 
         self.simuler_joueur() # S'occuper du joueur
 
@@ -404,7 +553,7 @@ class Scene:
             pg.Surface: rendu de la scène
         """
         if self.is_graphique():
-            return self.get_scene_graphique().rendu_2d()
+            return self.get_scene_graphique().get_rendu()
         retour = pg.image.load("textures/inconnu.png").convert_alpha()
         return retour
     
@@ -425,3 +574,19 @@ class Scene:
 
         rotation = (vitesse_rotation * touches_h[1] - vitesse_rotation * touches_h[0])
         joueur.rotate(rotation)
+
+        if self.is_graphique(): # Dessiner l'avant du joueur
+            position = (joueur.get_position()[0], joueur.get_position()[1])
+            position_raycast = (joueur.get_position()[0] + 1 - 0.5, joueur.get_position()[1] + 1 - 0.5)
+
+            angle = joueur.get_angle()
+            fov = self.get_structure_de_base().get_fov()
+            nb_raycast = 225
+            position = (position[0] * self.get_scene_graphique().get_largeur_carre_2d() + self.get_scene_graphique().get_largeur_carre_2d() / 2, position[1] * self.get_scene_graphique().get_hauteur_carre_2d() + self.get_scene_graphique().get_largeur_carre_2d() / 2)
+            ratio = fov / nb_raycast
+            for i in range(nb_raycast):
+                vecteur_avant = ob.calculer_vecteur(angle - fov / 2 + i * ratio)
+                raycast = self.get_scene_graphique().ray_cast(position_raycast, vecteur_avant)
+                if raycast != None:
+                    position_finale = (raycast.get_position_touche()[0] * self.get_scene_graphique().get_largeur_carre_2d(), raycast.get_position_touche()[1] * self.get_scene_graphique().get_largeur_carre_2d())
+                    pg.draw.line(self.get_scene_graphique().get_rendu(), (0, 0, 255), position, position_finale, 1)

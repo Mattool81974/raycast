@@ -12,6 +12,29 @@
 # Importer les librairies
 import math
 
+def calculer_vecteur(angle: float) -> tuple:
+    """Retourne un vecteur selon l'angle
+
+    Args:
+        angle (float): angle pour calculer le vecteur
+
+    Returns:
+        tuple: vecteur final
+    """
+    return normaliser_vecteur((math.cos(math.radians(angle)), math.sin(math.radians(angle)), 0))
+
+def distance(position_1: tuple, position_2: tuple) -> float:
+    """Retourne la distance entre deux points
+
+    Args:
+        position_1 (tuple): premier point
+        position_2 (tuple): deuxième point
+
+    Returns:
+        float: distance entre les points
+    """
+    return math.sqrt((position_1[0] - position_2[0]) ** 2 + (position_1[1] - position_2[1]) ** 2)
+
 def normaliser_vecteur(vecteur: tuple) -> tuple:
     """Normaliser un vecteur
 
@@ -46,7 +69,7 @@ class Objet:
         """
 
         # Calculer le vecteur avant en utilisant de la trigonométrie
-        self.vecteur_avant = normaliser_vecteur((math.cos(math.radians(self.get_angle())), math.sin(math.radians(self.get_angle())), 0))
+        self.vecteur_avant = calculer_vecteur(self.get_angle())
 
     def get_angle(self) -> float:
         """Retourne l'angle de l'objet

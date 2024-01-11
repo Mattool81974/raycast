@@ -14,6 +14,7 @@ class Structure_De_Base:
         """Créer une structure de base
         """
         self.delta_time = 0
+        self.fov = 45
         self.taille_fenetre = taille_fenetre
         self.touches_pressees = []
 
@@ -24,6 +25,14 @@ class Structure_De_Base:
             float: temps entre la dernière frame et cette frame
         """
         return self.delta_time
+    
+    def get_fov(self) -> float:
+        """Retourne le fov du jeu
+
+        Returns:
+            float: fov du jeu
+        """
+        return self.fov
 
     def get_taille_fenetre(self) -> tuple:
         """Retourne la taille de la fenêtre
