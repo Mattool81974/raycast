@@ -5,6 +5,7 @@
 # Importer les librairies
 import pygame as pg
 import scene as sc
+import structure_de_base as sb
 import sys
 
 class Moteur_De_Jeu:
@@ -16,10 +17,12 @@ class Moteur_De_Jeu:
         """
         self.scene_actuelle = "" # Scène actuelle affichée
         self.scenes = {} # Dictionnaire des scène créees avec en clé le nom de la scène et en valeur la scène
+        self.structure_de_base = sb.Structure_De_Base(taille_fenetre = taille_fenetre)
         self.taille_fenetre = taille_fenetre
 
         pg.init()
         self.fenetre = pg.display.set_mode(self.get_taille_fenetre())
+        self.horloge = pg.time.Clock()
 
     def ajouter_scene(self, nom: str, scene: sc.Scene) -> None:
         """Ajoute une scène dans le jeu
@@ -46,6 +49,12 @@ class Moteur_De_Jeu:
             if evenement.type == pg.QUIT: # Quitter le jeu
                 pg.quit()
                 sys.exit()
+            elif evenement.type == pg.KEYDOWN: # Si une touche est pressé
+                if self.get_structure_de_base().get_touches_pressees().count(evenement.key) <= 0:
+                    self.get_structure_de_base().get_touches_pressees().append(evenement.key)
+            elif evenement.type == pg.KEYUP: # Si une touche est laché
+                if self.get_structure_de_base().get_touches_pressees().count(evenement.key) > 0:
+                    self.get_structure_de_base().get_touches_pressees().remove(evenement.key)
 
     def get_fenetre(self) -> pg.Surface:
         """Retourne la fenêtre du jeu
@@ -54,6 +63,14 @@ class Moteur_De_Jeu:
             pg.Surface: fenêtre du jeu
         """
         return self.fenetre
+    
+    def get_horloge(self) -> pg.time.Clock:
+        """Retourne l'horloge du jeu
+
+        Returns:
+            pg.time.Clock: horloge du jeu
+        """
+        return self.horloge
 
     def get_nom_scene_actuelle(self) -> str:
         """Retourne le nom de la scène actuelle dans le jeu
@@ -79,6 +96,14 @@ class Moteur_De_Jeu:
         """
         return self.scenes
     
+    def get_structure_de_base(self) -> sb.Structure_De_Base:
+        """Retourne la structure de base dans le jeu
+
+        Returns:
+            tuple: structure de base dans le jeu
+        """
+        return self.structure_de_base
+    
     def get_taille_fenetre(self) -> tuple:
         """Retourne la taille de la fenêtre
 
@@ -94,6 +119,7 @@ class Moteur_De_Jeu:
             self.gerer_evenements()
             self.frame()
             pg.display.flip()
+            self.get_structure_de_base().set_delta_time(self.get_horloge().tick(120) * 0.001)
     
     def nouvelle_scene(self, nom: str, carte: str, graphique: bool = True, physique: bool = True) -> sc.Scene:
         """Crée une nouvelle scène dans le jeu et la retoure
@@ -108,7 +134,7 @@ class Moteur_De_Jeu:
             sc.Scene: scène crée
         """
         assert list(self.get_scenes().keys()).count(nom) <= 0, ("Moteur de jeu : la scène \"" + nom + "\" existe déjà dans le jeu.")
-        scene = sc.Scene(nom, carte, self.get_taille_fenetre(), graphique = graphique, physique = physique)
+        scene = sc.Scene(nom, carte, self.get_taille_fenetre(), self.get_structure_de_base(), graphique = graphique, physique = physique)
         self.ajouter_scene(nom, scene)
         return scene
     
